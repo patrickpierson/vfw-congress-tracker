@@ -1,89 +1,142 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VFW Congressional Bills</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-    </style>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>VFW Congressional Bills</title>
+ <script src="https://cdn.tailwindcss.com"></script>
+ <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+ <style>
+  body {
+   font-family: 'Inter', sans-serif;
+  }
+ </style>
 </head>
-<body class="bg-slate-50 text-slate-800">
+<body class="bg-slate-50 text-slate-700">
 
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
-        <div class="bg-white rounded-3xl shadow-2xl p-6 sm:p-10">
-            <header class="text-center mb-10">
-                <h1 class="text-4xl sm:text-5xl font-extrabold text-slate-900 mb-2">VFW Bill Tracker</h1>
-                <p class="text-slate-500 text-lg">A concise overview of bills and their support status from the VFW.</p>
-            </header>
+ <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+  <div class="bg-white rounded-3xl shadow-2xl p-6 sm:p-10">
+   <header class="text-center mb-10">
+    <h1 class="text-4xl sm:text-5xl font-extrabold text-[#991a1e] mb-2">VFW Bill Tracker</h1>
+    <p class="text-[#a79055] text-lg">A concise overview of bills and their support status from the VFW.</p>
+   </header>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {% for bill in bills %}
-                <div class="p-6 bg-slate-100 rounded-2xl shadow-md border border-slate-200 cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1" onclick="showBillDetails('{{ bill['bill_number'] }}', '{{ bill['bill_title'] }}', '{{ bill['status'] }}')">
-                    <div class="flex items-center justify-between mb-4">
-                        <span class="text-xl font-bold text-slate-900">{{ bill['bill_number'] }}</span>
-                        <div class="flex-shrink-0">
-                            {% if bill['status'] == 'support this bill' %}
-                                <div class="bg-green-100 p-1 rounded-full">
-                                    <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                    </svg>
-                                </div>
-                            {% elif bill['status'] == 'oppose this bill' %}
-                                <div class="bg-red-100 p-1 rounded-full">
-                                    <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                    </svg>
-                                </div>
-                            {% else %}
-                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                    {{ bill['status'] }}
-                                </span>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <p class="text-sm text-slate-600">{{ bill['bill_title'] }}</p>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
+   <div class="mb-6 flex justify-center sm:justify-end">
+    <select id="statusFilter" onchange="filterBills()" class="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500">
+     <option value="all">All Bills</option>
+     <option value="support this bill">Supported</option>
+     <option value="oppose this bill">Opposed</option>
+    </select>
+   </div>
+
+   <div id="bill-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for bill in bills %}
+    <div class="bill-card p-6 bg-slate-100 rounded-2xl shadow-md border border-slate-200 cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1" data-status="{{ bill['status'] }}" data-cosponsors="{{ bill['cosponsors'] }}" data-url="{{ bill['url'] }}" onclick="showBillDetails('{{ bill['bill_number'] }}', '{{ bill['bill_title'] }}', '{{ bill['status'] }}', '{{ bill['cosponsors'] }}', '{{ bill['url'] }}')">
+     <div class="flex items-center justify-between mb-4">
+      <a href="{{ bill['url'] }}" target="_blank" class="text-xl font-bold text-slate-700 hover:underline">
+        {{ bill['bill_number'] }}
+      </a>
+      <div class="flex-shrink-0">
+       {% if bill['status'] == 'support this bill' %}
+       <div class="bg-green-100 p-1 rounded-full">
+        <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+       </div>
+       {% elif bill['status'] == 'oppose this bill' %}
+       <div class="bg-red-100 p-1 rounded-full">
+        <svg class="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+       </div>
+       {% else %}
+       <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+        {{ bill['status'] }}
+       </span>
+       {% endif %}
+      </div>
+     </div>
+     <p class="text-sm text-slate-700">{{ bill['bill_title'] }}</p>
     </div>
+    {% endfor %}
+   </div>
+  </div>
+ </div>
 
-    <div id="detailsModal" class="fixed inset-0 z-50 overflow-auto bg-gray-800 bg-opacity-75 items-center justify-center hidden">
-        <div class="bg-white rounded-3xl shadow-xl p-8 m-4 max-w-lg w-full">
-            <div class="flex justify-between items-center pb-3">
-                <h3 class="text-2xl font-bold text-slate-900" id="modalTitle"></h3>
-                <button class="modal-close cursor-pointer z-50" onclick="closeModal()">
-                    <svg class="fill-current text-slate-700 hover:text-slate-900" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
-                        <path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path>
-                    </svg>
-                </button>
-            </div>
-            <div class="text-slate-600">
-                <p class="text-sm mt-2" id="modalNumber"></p>
-                <p class="text-sm mt-2" id="modalStatus"></p>
-            </div>
-        </div>
-    </div>
+ <div id="detailsModal" class="fixed inset-0 z-50 overflow-auto bg-gray-800 bg-opacity-75 items-center justify-center hidden">
+  <div class="bg-white rounded-3xl shadow-xl p-8 m-4 max-w-lg w-full">
+   <div class="flex justify-between items-center pb-3">
+    <h3 class="text-2xl font-bold text-slate-700" id="modalTitle"></h3>
+    <button class="modal-close cursor-pointer z-50" onclick="closeModal()">
+     <svg class="fill-current text-slate-700 hover:text-slate-700" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+      <path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path>
+     </svg>
+    </button>
+   </div>
+   <div class="text-slate-700">
+    <p class="text-sm mt-2" id="modalNumber"></p>
+    <p class="text-sm mt-2" id="modalStatus"></p>
+    <p class="text-sm mt-2" id="modalCosponsors"></p>
+   </div>
+  </div>
+ </div>
 
-    <script>
-        function showBillDetails(billNumber, billTitle, billStatus) {
-            document.getElementById('modalTitle').innerText = billTitle;
-            document.getElementById('modalNumber').innerText = `Bill Number: ${billNumber}`;
-            document.getElementById('modalStatus').innerText = `Status: ${billStatus}`;
-            document.getElementById('detailsModal').classList.remove('hidden');
-            document.getElementById('detailsModal').classList.add('flex');
-        }
+ <script>
+  const ALL_STATES = [
+   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+   'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+   'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
+  ];
 
-        function closeModal() {
-            document.getElementById('detailsModal').classList.add('hidden');
-            document.getElementById('detailsModal').classList.remove('flex');
-        }
-    </script>
+  function showBillDetails(billNumber, billTitle, billStatus, cosponsors, billUrl) {
+   document.getElementById('modalTitle').innerText = billTitle;
+   document.getElementById('modalNumber').innerHTML = `Bill Number: <a href="${billUrl}" target="_blank" class="text-blue-600 hover:underline">${billNumber}</a>`;
+   
+   let statusText = '';
+   if (billStatus === 'support this bill') {
+    statusText = 'Status: ✅ Supported';
+   } else if (billStatus === 'oppose this bill') {
+    statusText = 'Status: ❌ Opposed';
+   } else {
+    statusText = `Status: ${billStatus}`;
+   }
+   document.getElementById('modalStatus').innerText = statusText;
+
+   let cosponsorText = '';
+   if (billStatus === 'support this bill') {
+    const cosponsorList = cosponsors.split(',').map(s => s.trim()).filter(s => s !== '');
+    const cosponsorSet = new Set(cosponsorList);
+    const nonCosponsorStates = ALL_STATES.filter(state => !cosponsorSet.has(state));
+    cosponsorText = `States NOT cosponsoring: ${nonCosponsorStates.join(', ')}`;
+   } else {
+    const cosponsorList = cosponsors.split(',');
+    cosponsorText = cosponsorList.length > 0 && cosponsors.trim() !== '' ? `Cosponsors: ${cosponsorList.join(', ')}` : 'Cosponsors: None';
+   }
+   document.getElementById('modalCosponsors').innerText = cosponsorText;
+
+   document.getElementById('detailsModal').classList.remove('hidden');
+   document.getElementById('detailsModal').classList.add('flex');
+  }
+
+  function closeModal() {
+   document.getElementById('detailsModal').classList.add('hidden');
+   document.getElementById('detailsModal').classList.remove('flex');
+  }
+
+  function filterBills() {
+   const selectedStatus = document.getElementById('statusFilter').value;
+   const billCards = document.querySelectorAll('.bill-card');
+   
+   billCards.forEach(card => {
+    const billStatus = card.getAttribute('data-status');
+    if (selectedStatus === 'all' || billStatus === selectedStatus) {
+     card.style.display = 'block';
+    } else {
+     card.style.display = 'none';
+    }
+   });
+  }
+ </script>
 
 </body>
 </html>

@@ -1,4 +1,5 @@
 from flask import Flask, render_template
+import aws_lambda_wsgi
 import csv
 import os
 
@@ -24,6 +25,9 @@ def home():
 
     # Pass the list of bills to the Jinja2 template for rendering
     return render_template('index.html', bills=bills)
+
+def lambda_handler(event, context):
+    return aws_lambda_wsgi.response(app, event, context)
 
 if __name__ == '__main__':
     # To run the app, you will need to install Flask: pip install Flask

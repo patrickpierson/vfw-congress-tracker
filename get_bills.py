@@ -1,10 +1,3 @@
-# This script scrapes a list of bills from the VFW VoterVoice website.
-# It uses Selenium to handle dynamically loaded content, as the bill list
-# is populated by JavaScript after the initial page load.
-#
-# To run this script, you need to install the required libraries:
-# pip install selenium webdriver-manager
-
 import sys
 import csv
 from selenium import webdriver
@@ -14,16 +7,44 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
+import requests
+import json
+import configparser
+import os
 
 # Set this to True to enable detailed debugging output.
 DEBUG = True
 
-def scrape_vfw_bills():
+def get_api_key():
+    """
+    Reads the API key from the config.ini file.
+    Returns the API key string or None if it's not found.
+    """
+    config = configparser.ConfigParser()
+    config_file_path = 'config.ini'
+
+    if not os.path.exists(config_file_path):
+        print(f"Error: The configuration file '{config_file_path}' was not found.")
+        return None
+
+    try:
+        config.read(config_file_path)
+        api_key = config.get('API', 'api_key')
+        return api_key
+    except (configparser.NoSectionError, configparser.NoOptionError) as e:
+        print(f"Error reading config file: {e}")
+        return None
+
+def scrape_vfw_bills(api_key):
     """
     Scrapes the list of bills supported by the VFW from their website using Selenium.
     Returns a list of dictionaries, where each dictionary represents a bill
     and contains its title, number, and support status.
     """
+    if not api_key:
+        print("API key is missing. Aborting scrape.", file=sys.stderr)
+        return None
+
     url = "https://votervoice.net/VFW/bills"
 
     # Set up headless Chrome options for a non-GUI environment
@@ -47,7 +68,6 @@ def scrape_vfw_bills():
         driver.get(url)
 
         # Use WebDriverWait to wait for the dynamic content to appear.
-        # This is the key difference from the previous non-working version.
         if DEBUG:
             print("Waiting for the 'jsSpotlightContainer' to be visible...")
         
@@ -112,6 +132,13 @@ def scrape_vfw_bills():
                     
                     status = status_span.get('title', 'N/A')
                     bill_data['status'] = status.replace('We ', '').strip()
+
+                    bill_type, bill_number = split_bill_id(bill_data['bill_number'])
+                    cosponsors = get_cosponsors(bill_type, bill_number, api_key)
+                    states = get_states_from_json(cosponsors)
+                    bill_data['cosponsors'] = states
+
+                    bill_data['url'] = legislation_url(bill_type, bill_number, api_key)
             
             if bill_data:
                 bills.append(bill_data)
@@ -132,22 +159,161 @@ def scrape_vfw_bills():
         if 'driver' in locals():
             driver.quit()
 
+def split_bill_id(bill_id_str):
+    """
+    Splits a bill ID string into its type and number.
+    
+    Args:
+        bill_id_str: The input string, e.g., 'H.R. 3132' or 'S. 649'.
+
+    Returns:
+        A tuple containing the lowercase bill type ('hr' or 's') and the
+        bill number (as a string).
+    """
+    # Split the string into two parts based on the space
+    parts = bill_id_str.split(' ')
+
+    # The first part is the type (e.g., 'H.R.', 'S.')
+    bill_type_raw = parts[0]
+
+    # The second part is the number (e.g., '3132', '649')
+    bill_number = parts[1]
+
+    # Clean up the bill type: convert to lowercase and remove the period
+    bill_type = bill_type_raw.lower().replace('.', '')
+
+    return bill_type, bill_number
+
+def legislation_url(bill_type, bill_number, api_key):
+    """
+    Fetches the list of cosponsors for a specific bill from the Congress.gov API.
+
+    Args:
+        bill_type (str): The type of the bill (e.g., 'hr', 's', 'hres').
+        bill_number (int): The number of the bill (e.g., 1).
+        api_key (str): Your personal API key for the Congress.gov API.
+
+    Returns:
+        string: A url containing the legislation.
+    """
+    # Construct the base URL using an f-string for easy readability.
+    base_url = "https://api.congress.gov/v3/bill/119/{bill_type}/{bill_number}"
+    
+    # Define the parameters to be sent with the GET request.
+    params = {
+        'api_key': api_key,
+        'format': 'json'  # Explicitly request JSON format.
+    }
+    # Use a try-except block to handle potential network or API errors.
+    try:
+        # Make the GET request to the API endpoint.
+        print(f"Attempting to fetch data for bill {bill_type.upper()} {bill_number}...")
+        response = requests.get(base_url.format(bill_type=bill_type, bill_number=bill_number), params=params)
+
+        # Raise an exception for bad status codes (4xx or 5xx).
+        response.raise_for_status()
+
+        # Check if the request was successful (status code 200).
+        if response.status_code == 200:
+            print("Successfully fetched data.")
+            # Parse the JSON response and return it.
+            return response.json().get('bill').get('legislationUrl')
+        else:
+            print(f"Error: API returned status code {response.status_code}")
+            return None
+
+    except requests.exceptions.RequestException as e:
+        # Handle exceptions related to the request, like connection errors or invalid URLs.
+        print(f"An error occurred: {e}")
+        return None
+    except json.JSONDecodeError:
+        # Handle cases where the response is not valid JSON.
+        print("Error: Could not decode JSON from the response.")
+        return None
+    
+
+def get_cosponsors(bill_type, bill_number, api_key):
+    """
+    Fetches the list of cosponsors for a specific bill from the Congress.gov API.
+
+    Args:
+        bill_type (str): The type of the bill (e.g., 'hr', 's', 'hres').
+        bill_number (int): The number of the bill (e.g., 1).
+        api_key (str): Your personal API key for the Congress.gov API.
+
+    Returns:
+        dict: A dictionary containing the JSON data from the API response if successful,
+              otherwise None.
+    """
+    # Construct the base URL using an f-string for easy readability.
+    base_url = "https://api.congress.gov/v3/bill/119/{bill_type}/{bill_number}/cosponsors"
+    
+    # Define the parameters to be sent with the GET request.
+    params = {
+        'api_key': api_key,
+        'format': 'json'  # Explicitly request JSON format.
+    }
+    
+    # Use a try-except block to handle potential network or API errors.
+    try:
+        # Make the GET request to the API endpoint.
+        print(f"Attempting to fetch data for bill {bill_type.upper()} {bill_number}...")
+        response = requests.get(base_url.format(bill_type=bill_type, bill_number=bill_number), params=params)
+
+        # Raise an exception for bad status codes (4xx or 5xx).
+        response.raise_for_status()
+
+        # Check if the request was successful (status code 200).
+        if response.status_code == 200:
+            print("Successfully fetched data.")
+            # Parse the JSON response and return it.
+            return response.json()
+        else:
+            print(f"Error: API returned status code {response.status_code}")
+            return None
+
+    except requests.exceptions.RequestException as e:
+        # Handle exceptions related to the request, like connection errors or invalid URLs.
+        print(f"An error occurred: {e}")
+        return None
+    except json.JSONDecodeError:
+        # Handle cases where the response is not valid JSON.
+        print("Error: Could not decode JSON from the response.")
+        return None
+
+def get_states_from_json(json_data):
+    """
+    Parses a JSON string to extract a list of states.
+
+    Args:
+        json_data: A string containing the JSON data.
+
+    Returns:
+        A string of comma-separated state abbreviations.
+    """
+    cosponsors = json_data.get('cosponsors', [])
+    states = [cosponsor.get('state') for cosponsor in cosponsors if cosponsor.get('state')]
+    unique_states = sorted(list(set(states)))
+    return ", ".join(unique_states)
+
 if __name__ == "__main__":
-    vfw_bills = scrape_vfw_bills()
+    api_key = get_api_key()
+    if api_key:
+        vfw_bills = scrape_vfw_bills(api_key)
 
-    if vfw_bills:
-        filename = "vfw_bills.csv"
-        fieldnames = ['bill_number', 'bill_title', 'status']
+        if vfw_bills:
+            filename = "vfw_bills.csv"
+            fieldnames = ['bill_number', 'bill_title', 'status', 'cosponsors', 'url']
 
-        try:
-            with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                writer.writeheader()
-                writer.writerows(vfw_bills)
-            print(f"\nSuccessfully scraped bills and saved to '{filename}'.")
-        except IOError as e:
-            print(f"An error occurred while writing to the CSV file: {e}", file=sys.stderr)
-    elif vfw_bills is not None:
-        print("\nNo bills found on the page.")
-    else:
-        print("\nFailed to scrape bills. Please check the error message above.")
+            try:
+                with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(vfw_bills)
+                print(f"\nSuccessfully scraped bills and saved to '{filename}'.")
+            except IOError as e:
+                print(f"An error occurred while writing to the CSV file: {e}", file=sys.stderr)
+        elif vfw_bills is not None:
+            print("\nNo bills found on the page.")
+        else:
+            print("\nFailed to scrape bills. Please check the error message above.")
