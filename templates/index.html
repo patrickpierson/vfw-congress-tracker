@@ -21,11 +21,14 @@
     <p class="text-[#a79055] text-lg">A concise overview of bills and their support status from the VFW.</p>
    </header>
 
-   <div class="mb-6 flex justify-center sm:justify-end">
+   <div class="mb-6 flex flex-col sm:flex-row justify-center sm:justify-end gap-4">
     <select id="statusFilter" onchange="filterBills()" class="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500">
      <option value="all">All Bills</option>
      <option value="support this bill">Supported</option>
      <option value="oppose this bill">Opposed</option>
+    </select>
+    <select id="stateFilter" onchange="filterBills()" class="px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-500">
+     <option value="all">All States</option>
     </select>
    </div>
 
@@ -34,7 +37,7 @@
     <div class="bill-card p-6 bg-slate-100 rounded-2xl shadow-md border border-slate-200 cursor-pointer hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1" data-status="{{ bill['status'] }}" data-cosponsors="{{ bill['cosponsors'] }}" data-url="{{ bill['url'] }}" onclick="showBillDetails('{{ bill['bill_number'] }}', '{{ bill['bill_title'] }}', '{{ bill['status'] }}', '{{ bill['cosponsors'] }}', '{{ bill['url'] }}')">
      <div class="flex items-center justify-between mb-4">
       <a href="{{ bill['url'] }}" target="_blank" class="text-xl font-bold text-slate-700 hover:underline">
-        {{ bill['bill_number'] }}
+       {{ bill['bill_number'] }}
       </a>
       <div class="flex-shrink-0">
        {% if bill['status'] == 'support this bill' %}
@@ -88,6 +91,17 @@
    'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
   ];
 
+  // Populate the state filter dropdown
+  window.onload = function() {
+   const stateFilter = document.getElementById('stateFilter');
+   ALL_STATES.forEach(state => {
+    const option = document.createElement('option');
+    option.value = state;
+    option.textContent = state;
+    stateFilter.appendChild(option);
+   });
+  };
+
   function showBillDetails(billNumber, billTitle, billStatus, cosponsors, billUrl) {
    document.getElementById('modalTitle').innerText = billTitle;
    document.getElementById('modalNumber').innerHTML = `Bill Number: <a href="${billUrl}" target="_blank" class="text-blue-600 hover:underline">${billNumber}</a>`;
@@ -109,8 +123,8 @@
     const nonCosponsorStates = ALL_STATES.filter(state => !cosponsorSet.has(state));
     cosponsorText = `States NOT cosponsoring: ${nonCosponsorStates.join(', ')}`;
    } else {
-    const cosponsorList = cosponsors.split(',');
-    cosponsorText = cosponsorList.length > 0 && cosponsors.trim() !== '' ? `Cosponsors: ${cosponsorList.join(', ')}` : 'Cosponsors: None';
+    const cosponsorList = cosponsors.split(',').map(s => s.trim()).filter(s => s !== '');
+    cosponsorText = cosponsorList.length > 0 ? `Cosponsors: ${cosponsorList.join(', ')}` : 'Cosponsors: None';
    }
    document.getElementById('modalCosponsors').innerText = cosponsorText;
 
@@ -125,11 +139,17 @@
 
   function filterBills() {
    const selectedStatus = document.getElementById('statusFilter').value;
+   const selectedState = document.getElementById('stateFilter').value;
    const billCards = document.querySelectorAll('.bill-card');
    
    billCards.forEach(card => {
     const billStatus = card.getAttribute('data-status');
-    if (selectedStatus === 'all' || billStatus === selectedStatus) {
+    const billCosponsors = card.getAttribute('data-cosponsors').split(',').map(s => s.trim());
+    
+    const statusMatch = (selectedStatus === 'all' || billStatus === selectedStatus);
+    const stateMatch = (selectedState === 'all' || billCosponsors.includes(selectedState));
+    
+    if (statusMatch && stateMatch) {
      card.style.display = 'block';
     } else {
      card.style.display = 'none';
